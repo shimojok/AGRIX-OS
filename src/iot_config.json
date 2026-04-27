@@ -1,0 +1,603 @@
+{
+  "_metadata": {
+    "schema": "agrix-os/iot-config/v1.0",
+    "description": "Azure IoT Central integration config for AGRIX-OS soil sensor nodes",
+    "agents_md_rules_applied": [
+      "IoT & Azure Integration: Generate configuration files for Azure IoT Central",
+      "IoT & Azure Integration: Use standard protocols (MQTT, OPC UA) for sensor simulation",
+      "IoT & Azure Integration: Assume deployment target is Yara/AGRA partner farm in Sub-Saharan Africa",
+      "Domain Rule AgriWare #1: Soil Redox First — Eh sensor is mandatory, not optional",
+      "Domain Rule AgriWare #3: MBT55 cycle = 24h — polling intervals respect biological clock",
+      "Prohibited: GHG flux output (N2O, CH4, CO2) must always be routed to carbon credit pipeline"
+    ],
+    "deployment_context": {
+      "region": "Sub-Saharan Africa",
+      "partners": ["Yara International", "Alliance for a Green Revolution in Africa (AGRA)"],
+      "connectivity": "intermittent — GSM/4G with solar-powered edge gateway",
+      "bandwidth_constraint": "low (< 50 kbps sustained)",
+      "power_source": "solar + LiFePO4 battery, 12V rail",
+      "ambient_temp_range_C": [18, 45],
+      "dust_ip_rating": "IP67 minimum for all outdoor units"
+    },
+    "azure_iot_central": {
+      "api_version": "2022-07-31",
+      "dtdl_version": "dtmi:dtdl:context;2",
+      "iotcentral_extension": "dtmi:iotcentral:context;2"
+    },
+    "created": "2026-04-27T00:00:00Z",
+    "maintainer": "AGRIX Platform Agent / shimojok/AGRIX-OS"
+  },
+
+  "azure_iot_central": {
+    "app_subdomain": "${AGRIX_IOT_APP_SUBDOMAIN}",
+    "app_id": "${AGRIX_IOT_APP_ID}",
+    "api_token": "${AGRIX_IOT_API_TOKEN}",
+    "dps_id_scope": "${AGRIX_DPS_ID_SCOPE}",
+    "dps_endpoint": "global.azure-devices-provisioning.net",
+    "iot_hub_hostname": "${AGRIX_IOT_HUB_HOSTNAME}",
+    "resource_group": "agrix-africa-rg",
+    "location": "eastus"
+  },
+
+  "device_template": {
+    "displayName": "AGRIX Soil Sensor Node v1",
+    "@id": "dtmi:bionexus:agrix:SoilSensorNode;1",
+    "@type": ["ModelDefinition", "DeviceModel"],
+    "@context": [
+      "dtmi:iotcentral:context;2",
+      "dtmi:dtdl:context;2"
+    ],
+    "capabilityModel": {
+      "@id": "dtmi:bionexus:agrix:SoilSensorInterface;1",
+      "@type": "Interface",
+      "displayName": { "en": "AGRIX Soil Sensor Interface" },
+      "description": {
+        "en": "MBT55 hypercycle soil sensor: pH, Eh (redox), moisture, temperature + GHG flux outputs for PBPE carbon credit pipeline"
+      },
+      "contents": [
+
+        {
+          "@type": ["Telemetry", "NumberValue"],
+          "@id": "dtmi:bionexus:agrix:SoilSensorInterface:soilPH;1",
+          "name": "soilPH",
+          "displayName": { "en": "Soil pH" },
+          "description": {
+            "en": "Soil solution pH. Feeds soil_dynamics.py environmental_stress(). MBT55 optimum: 7.2"
+          },
+          "schema": "double",
+          "unit": "unitless",
+          "displayUnit": "pH",
+          "minValue": 2.0,
+          "maxValue": 10.0,
+          "decimalPlaces": 2
+        },
+
+        {
+          "@type": ["Telemetry", "NumberValue"],
+          "@id": "dtmi:bionexus:agrix:SoilSensorInterface:soilEh;1",
+          "name": "soilEh",
+          "displayName": { "en": "Soil Redox Potential (Eh)" },
+          "description": {
+            "en": "AGENTS.md Rule #1 — Soil is a battery. Eh is the primary electron budget indicator. Controls aerobic/anaerobic pathway switch in M3-Core-Engine. Range: -300 to +700 mV."
+          },
+          "schema": "double",
+          "unit": "millivolt",
+          "displayUnit": "mV",
+          "minValue": -300.0,
+          "maxValue": 700.0,
+          "decimalPlaces": 1
+        },
+
+        {
+          "@type": ["Telemetry", "NumberValue"],
+          "@id": "dtmi:bionexus:agrix:SoilSensorInterface:soilMoisture;1",
+          "name": "soilMoisture",
+          "displayName": { "en": "Soil Volumetric Water Content" },
+          "description": {
+            "en": "Volumetric water content %. Above 70% VWC: oxygen diffusion drops → anaerobic dominance in aerobic_fraction(). Critical for MBT55 consortium balance (55% aerobic target)."
+          },
+          "schema": "double",
+          "unit": "percent",
+          "displayUnit": "%VWC",
+          "minValue": 0.0,
+          "maxValue": 100.0,
+          "decimalPlaces": 1
+        },
+
+        {
+          "@type": ["Telemetry", "Temperature"],
+          "@id": "dtmi:bionexus:agrix:SoilSensorInterface:soilTemperature;1",
+          "name": "soilTemperature",
+          "displayName": { "en": "Soil Temperature" },
+          "description": {
+            "en": "Soil temperature at 10cm depth. MBT55 thermophilic optimum: 80-100°C (in-reactor). Field range 18-45°C in SSA. Feeds environmental_stress() T_opt=90°C parameter."
+          },
+          "schema": "double",
+          "unit": "degreeCelsius",
+          "displayUnit": "°C",
+          "minValue": -5.0,
+          "maxValue": 105.0,
+          "decimalPlaces": 1
+        },
+
+        {
+          "@type": ["Telemetry", "NumberValue"],
+          "@id": "dtmi:bionexus:agrix:SoilSensorInterface:ghgCO2Flux;1",
+          "name": "ghgCO2Flux",
+          "displayName": { "en": "Soil CO₂ Flux" },
+          "description": {
+            "en": "Soil surface CO2 efflux rate. AGENTS.md Prohibited: must not be suppressed — feeds PBPE carbon credit pipeline via soil_carbon_seq_rate schema."
+          },
+          "schema": "double",
+          "unit": "gram per square metre per day",
+          "displayUnit": "g CO₂/m²/day",
+          "minValue": 0.0,
+          "maxValue": 50.0,
+          "decimalPlaces": 3
+        },
+
+        {
+          "@type": ["Telemetry", "NumberValue"],
+          "@id": "dtmi:bionexus:agrix:SoilSensorInterface:ghgCH4Flux;1",
+          "name": "ghgCH4Flux",
+          "displayName": { "en": "Soil CH₄ Flux" },
+          "description": {
+            "en": "Methane flux. Positive = emission; negative = uptake (methane oxidising bacteria active). Routes to PBPE GHG accounting."
+          },
+          "schema": "double",
+          "unit": "milligram per square metre per day",
+          "displayUnit": "mg CH₄/m²/day",
+          "minValue": -5.0,
+          "maxValue": 200.0,
+          "decimalPlaces": 3
+        },
+
+        {
+          "@type": ["Telemetry", "NumberValue"],
+          "@id": "dtmi:bionexus:agrix:SoilSensorInterface:ghgN2OFlux;1",
+          "name": "ghgN2OFlux",
+          "displayName": { "en": "Soil N₂O Flux" },
+          "description": {
+            "en": "Nitrous oxide flux. GWP=265. Critical for IPCC Tier 2 N2O accounting. MBT55 nitrification inhibition target: reduce by 50-70%."
+          },
+          "schema": "double",
+          "unit": "microgram per square metre per hour",
+          "displayUnit": "μg N₂O/m²/h",
+          "minValue": -10.0,
+          "maxValue": 500.0,
+          "decimalPlaces": 3
+        },
+
+        {
+          "@type": ["Telemetry", "NumberValue"],
+          "@id": "dtmi:bionexus:agrix:SoilSensorInterface:batteryVoltage;1",
+          "name": "batteryVoltage",
+          "displayName": { "en": "Node Battery Voltage" },
+          "description": {
+            "en": "Solar/LiFePO4 battery voltage. Below 11.5V: reduce telemetry to low-power mode (1-hour interval). Critical for SSA off-grid deployment."
+          },
+          "schema": "double",
+          "unit": "volt",
+          "displayUnit": "V",
+          "minValue": 10.0,
+          "maxValue": 14.6,
+          "decimalPlaces": 2
+        },
+
+        {
+          "@type": ["Telemetry", "NumberValue"],
+          "@id": "dtmi:bionexus:agrix:SoilSensorInterface:signalRssi;1",
+          "name": "signalRssi",
+          "displayName": { "en": "GSM Signal RSSI" },
+          "description": {
+            "en": "GSM/4G RSSI in dBm. Below -95 dBm: switch to store-and-forward mode. SSA connectivity resilience."
+          },
+          "schema": "double",
+          "unit": "decibel",
+          "displayUnit": "dBm",
+          "minValue": -120.0,
+          "maxValue": -40.0,
+          "decimalPlaces": 0
+        },
+
+        {
+          "@type": "Property",
+          "@id": "dtmi:bionexus:agrix:SoilSensorInterface:farmId;1",
+          "name": "farmId",
+          "displayName": { "en": "Farm ID" },
+          "description": { "en": "Yara/AGRA partner farm unique identifier. Format: CC_CROP_NNN (e.g. KE_COFFEE_001)" },
+          "schema": "string",
+          "writable": false
+        },
+
+        {
+          "@type": "Property",
+          "@id": "dtmi:bionexus:agrix:SoilSensorInterface:fieldZoneId;1",
+          "name": "fieldZoneId",
+          "displayName": { "en": "Field Zone ID" },
+          "description": { "en": "Sub-field zone identifier for spatial phenotype mapping. Format: ZONE_A through ZONE_Z." },
+          "schema": "string",
+          "writable": false
+        },
+
+        {
+          "@type": "Property",
+          "@id": "dtmi:bionexus:agrix:SoilSensorInterface:sensorDepthCm;1",
+          "name": "sensorDepthCm",
+          "displayName": { "en": "Sensor Installation Depth" },
+          "description": { "en": "Soil depth of sensor installation in cm. Recommended: 10cm (root zone)." },
+          "schema": "double",
+          "unit": "centimetre",
+          "displayUnit": "cm",
+          "writable": false
+        },
+
+        {
+          "@type": "Property",
+          "@id": "dtmi:bionexus:agrix:SoilSensorInterface:mbt55LastDoseL;1",
+          "name": "mbt55LastDoseL",
+          "displayName": { "en": "Last MBT55 Dose (L/ha)" },
+          "description": {
+            "en": "MBT55 inoculum applied at last intervention (L/ha). Written by AgriWare™ actuator after prescription execution. Feeds SoilSensorReading.mbt55_dose_L_ha."
+          },
+          "schema": "double",
+          "unit": "litre",
+          "writable": true
+        },
+
+        {
+          "@type": "Property",
+          "@id": "dtmi:bionexus:agrix:SoilSensorInterface:agriwarePhase;1",
+          "name": "agriwarePhase",
+          "displayName": { "en": "AgriWare™ Eco-Phenotype Phase" },
+          "description": {
+            "en": "Current phase from AgriWare™ DiagnosticEngine. Written by cloud; read by edge for local alert LED. Values: ACCELERATING_IMPROVEMENT | DIMINISHING_IMPROVEMENT | STABLE | DIMINISHING_DEGRADATION | ACCELERATING_DEGRADATION"
+          },
+          "schema": "string",
+          "writable": true
+        },
+
+        {
+          "@type": "Command",
+          "@id": "dtmi:bionexus:agrix:SoilSensorInterface:triggerReading;1",
+          "name": "triggerReading",
+          "displayName": { "en": "Trigger Immediate Sensor Reading" },
+          "description": {
+            "en": "Force an out-of-schedule sensor read. Used by AgriWare™ after MBT55 injection to capture t=0 baseline."
+          },
+          "request": {
+            "name": "reason",
+            "displayName": { "en": "Trigger Reason" },
+            "schema": "string"
+          },
+          "response": {
+            "name": "ackTimestamp",
+            "displayName": { "en": "ACK Timestamp (ISO8601)" },
+            "schema": "string"
+          }
+        },
+
+        {
+          "@type": "Command",
+          "@id": "dtmi:bionexus:agrix:SoilSensorInterface:setPollingInterval;1",
+          "name": "setPollingInterval",
+          "displayName": { "en": "Set Telemetry Polling Interval" },
+          "description": {
+            "en": "Override polling interval. AgriWare™ sets to 15min during ACCELERATING_DEGRADATION; 60min during STABLE. Respects MBT55 24h biological clock."
+          },
+          "request": {
+            "name": "intervalMinutes",
+            "displayName": { "en": "Interval (minutes)" },
+            "schema": "integer"
+          },
+          "response": {
+            "name": "appliedInterval",
+            "schema": "integer"
+          }
+        }
+
+      ]
+    }
+  },
+
+  "mqtt": {
+    "_notes": "Azure IoT Hub MQTT — TLS 1.2 mandatory. Standard IoT Hub topic conventions.",
+    "protocol": "MQTTv3.1.1",
+    "broker": "${AGRIX_IOT_HUB_HOSTNAME}",
+    "port_tls": 8883,
+    "port_websocket_tls": 443,
+    "tls": {
+      "enabled": true,
+      "version": "TLSv1.2",
+      "ca_cert_path": "/etc/agrix/certs/DigiCert_Global_Root_G2.crt",
+      "client_cert_path": "/etc/agrix/certs/device-cert.pem",
+      "client_key_path":  "/etc/agrix/certs/device-key.pem"
+    },
+    "client_id_template": "${DEVICE_ID}",
+    "username_template":  "${AGRIX_IOT_HUB_HOSTNAME}/${DEVICE_ID}/?api-version=2021-04-12&DeviceClientType=AGRIX-OS%2F1.0",
+    "password": "${DEVICE_SAS_TOKEN_OR_X509_EMPTY}",
+    "keepalive_seconds": 60,
+    "clean_session": false,
+    "topics": {
+      "telemetry_publish":      "devices/${DEVICE_ID}/messages/events/",
+      "telemetry_publish_encoded": "devices/${DEVICE_ID}/messages/events/%24.ct=application%2Fjson&%24.ce=utf-8",
+      "properties_reported":    "$iothub/twin/PATCH/properties/reported/?$rid=${REQUEST_ID}",
+      "properties_desired_sub": "$iothub/twin/PATCH/properties/desired/#",
+      "twin_get_pub":           "$iothub/twin/GET/?$rid=${REQUEST_ID}",
+      "twin_get_sub":           "$iothub/twin/res/#",
+      "command_sub":            "$iothub/methods/POST/#",
+      "command_response_pub":   "$iothub/methods/res/${STATUS}/?$rid=${REQUEST_ID}",
+      "dps_register_pub":       "$dps/registrations/PUT/iotdps-register/?$rid=${REQUEST_ID}",
+      "dps_result_sub":         "$dps/registrations/res/#"
+    },
+    "qos": {
+      "telemetry": 1,
+      "commands":  1,
+      "properties": 1
+    },
+    "africa_resilience": {
+      "store_and_forward": true,
+      "local_buffer_path": "/var/agrix/mqtt_buffer",
+      "local_buffer_max_mb": 64,
+      "reconnect_backoff_seconds": [5, 10, 30, 60, 120],
+      "offline_telemetry_max_queue": 2880,
+      "note": "2880 = 30min interval × 24h × 4 days of offline storage"
+    }
+  },
+
+  "opc_ua": {
+    "_notes": "OPC UA used for wired sensor nodes in processing facility / MBT55 reactor monitoring. Not typically used in open-field SSA nodes — included per AGENTS.md requirement.",
+    "enabled_in_reactor_context": true,
+    "endpoint_url_template": "opc.tcp://${REACTOR_HOST}:4840/agrix/reactor",
+    "security_policy": "Basic256Sha256",
+    "security_mode": "SignAndEncrypt",
+    "authentication": "Certificate",
+    "cert_path": "/etc/agrix/certs/opc-client-cert.pem",
+    "key_path":  "/etc/agrix/certs/opc-client-key.pem",
+    "server_cert_path": "/etc/agrix/certs/opc-server-cert.pem",
+    "session_timeout_ms": 30000,
+    "subscription_publishing_interval_ms": 1000,
+    "nodes": {
+      "_description": "OPC UA node IDs for MBT55 reactor sensors (in-reactor context: 80-100°C thermophilic range)",
+      "reactor_temperature":  "ns=2;s=AGRIX.Reactor.Temperature",
+      "reactor_pH":           "ns=2;s=AGRIX.Reactor.pH",
+      "reactor_Eh":           "ns=2;s=AGRIX.Reactor.Eh",
+      "reactor_moisture":     "ns=2;s=AGRIX.Reactor.Moisture",
+      "reactor_O2_percent":   "ns=2;s=AGRIX.Reactor.O2",
+      "reactor_CO2_percent":  "ns=2;s=AGRIX.Reactor.CO2",
+      "mbt55_dose_valve":     "ns=2;s=AGRIX.Actuator.MBT55Valve",
+      "cycle_elapsed_h":      "ns=2;s=AGRIX.Reactor.CycleElapsedHours"
+    },
+    "bridge_to_iot_central": {
+      "enabled": true,
+      "bridge_module": "azure-iot-opcua-publisher",
+      "publish_interval_s": 60,
+      "map_to_dtdl": {
+        "AGRIX.Reactor.Temperature": "soilTemperature",
+        "AGRIX.Reactor.pH":          "soilPH",
+        "AGRIX.Reactor.Eh":          "soilEh",
+        "AGRIX.Reactor.Moisture":    "soilMoisture"
+      }
+    }
+  },
+
+  "sensors": {
+    "_notes": "Reference hardware for Yara/AGRA SSA farm deployments. All IP67+, solar-compatible.",
+    "pH": {
+      "parameter": "soilPH",
+      "range": [2.0, 10.0],
+      "resolution": 0.01,
+      "accuracy": "±0.1 pH",
+      "sampling_interval_normal_min": 30,
+      "sampling_interval_degradation_min": 15,
+      "sampling_interval_low_power_min": 60,
+      "calibration_interval_days": 30,
+      "reference_model": "Atlas Scientific EZO-pH (I2C)",
+      "soil_dynamics_field": "pH",
+      "dtdl_name": "soilPH",
+      "alert_thresholds": {
+        "critical_low":  4.5,
+        "warning_low":   5.5,
+        "optimal_low":   6.5,
+        "optimal_high":  7.8,
+        "warning_high":  8.5,
+        "critical_high": 9.0
+      }
+    },
+    "Eh": {
+      "parameter": "soilEh",
+      "unit": "mV",
+      "range": [-300, 700],
+      "resolution": 1,
+      "accuracy": "±5 mV",
+      "sampling_interval_normal_min": 30,
+      "sampling_interval_degradation_min": 15,
+      "sampling_interval_low_power_min": 60,
+      "reference_model": "Atlas Scientific EZO-ORP (I2C)",
+      "soil_dynamics_field": "Eh_mV",
+      "dtdl_name": "soilEh",
+      "agriware_rule": "AGENTS.md Rule#1: Soil Redox First. aerobic_fraction() threshold at Eh=50mV.",
+      "alert_thresholds": {
+        "note": "Eh < -100 mV = strictly anaerobic (methanogenic). Eh 100-300 mV = aerobic optimum for MBT55.",
+        "critical_low_mV":  -200,
+        "warning_low_mV":   -50,
+        "aerobic_optimal_low_mV":  100,
+        "aerobic_optimal_high_mV": 400,
+        "warning_high_mV":  550,
+        "critical_high_mV": 650
+      }
+    },
+    "moisture": {
+      "parameter": "soilMoisture",
+      "unit": "%VWC",
+      "range": [0, 100],
+      "resolution": 0.1,
+      "accuracy": "±3%VWC",
+      "sampling_interval_normal_min": 30,
+      "sampling_interval_degradation_min": 15,
+      "sampling_interval_low_power_min": 60,
+      "reference_model": "Sentek Drill & Drop (SDI-12) or TEROS-12 (SDI-12)",
+      "soil_dynamics_field": "moisture_pct",
+      "dtdl_name": "soilMoisture",
+      "alert_thresholds": {
+        "critical_low_pct":  15,
+        "warning_low_pct":   25,
+        "aerobic_switch_pct": 70,
+        "note": "Above 70%VWC: aerobic_fraction() drops sharply. Triggers anaerobic-dominant prescription.",
+        "warning_high_pct":  80,
+        "critical_high_pct": 90
+      }
+    },
+    "temperature": {
+      "parameter": "soilTemperature",
+      "unit": "°C",
+      "range": [-5, 105],
+      "resolution": 0.1,
+      "accuracy": "±0.5°C",
+      "depth_cm": 10,
+      "sampling_interval_normal_min": 30,
+      "sampling_interval_degradation_min": 15,
+      "sampling_interval_low_power_min": 60,
+      "reference_model": "Dallas DS18B20 (1-Wire, waterproof)",
+      "soil_dynamics_field": "temperature_C",
+      "dtdl_name": "soilTemperature",
+      "alert_thresholds": {
+        "critical_low_C":  5,
+        "warning_low_C":  15,
+        "mbt55_field_optimal_low_C":  20,
+        "mbt55_field_optimal_high_C": 38,
+        "mbt55_reactor_optimal_C":    90,
+        "warning_high_C": 45,
+        "critical_high_C": 55
+      }
+    },
+    "ghg_flux": {
+      "_notes": "GHG sensors — mandatory per AGENTS.md Prohibited clause. Routes to PBPE carbon credit system.",
+      "CO2": {
+        "dtdl_name": "ghgCO2Flux",
+        "method": "static chamber + NDIR (e.g. SenseAir Sunrise S11)",
+        "sampling_interval_min": 60,
+        "pbpe_pipeline": true
+      },
+      "CH4": {
+        "dtdl_name": "ghgCH4Flux",
+        "method": "static chamber + catalytic bead",
+        "sampling_interval_min": 60,
+        "pbpe_pipeline": true
+      },
+      "N2O": {
+        "dtdl_name": "ghgN2OFlux",
+        "method": "static chamber + electrochemical (GWP=265)",
+        "sampling_interval_min": 60,
+        "ipcc_tier": 2,
+        "pbpe_pipeline": true
+      }
+    }
+  },
+
+  "telemetry_payload": {
+    "_notes": "Canonical JSON telemetry payload published to IoT Central via MQTT. All field names match DTDL capabilityModel contents[].name exactly.",
+    "example_normal_mode": {
+      "soilPH":          6.82,
+      "soilEh":          185.3,
+      "soilMoisture":    58.4,
+      "soilTemperature": 28.1,
+      "ghgCO2Flux":      4.230,
+      "ghgCH4Flux":      0.012,
+      "ghgN2OFlux":      8.750,
+      "batteryVoltage":  13.1,
+      "signalRssi":      -78.0
+    },
+    "example_mbt55_post_injection_t0": {
+      "_note": "Triggered by triggerReading command immediately after MBT55 dose. Captures pre-response baseline.",
+      "soilPH":          6.40,
+      "soilEh":          90.0,
+      "soilMoisture":    65.2,
+      "soilTemperature": 27.8,
+      "ghgCO2Flux":      5.100,
+      "ghgCH4Flux":      0.035,
+      "ghgN2OFlux":      12.000,
+      "batteryVoltage":  12.8,
+      "signalRssi":      -82.0
+    },
+    "routing": {
+      "primary":   "Azure IoT Central → Stream Analytics → M3-Core-Engine ODE",
+      "ghg_branch": "Azure IoT Central → Event Hub → PBPE Finance Engine (carbon_seq_rate schema)",
+      "safelychain": "Azure IoT Central → Blob Storage → SafelyChain™ ledger hash input"
+    }
+  },
+
+  "polling_schedule": {
+    "_notes": "Polling interval adapts to AgriWare™ eco-phenotype phase. Respects MBT55 24h biological clock (AGENTS.md Rule#3).",
+    "phases": {
+      "ACCELERATING_IMPROVEMENT":  { "interval_min": 30,  "rationale": "Monitor improvement rate; no action needed" },
+      "DIMINISHING_IMPROVEMENT":   { "interval_min": 20,  "rationale": "Prepare for next intervention; higher resolution" },
+      "STABLE":                    { "interval_min": 60,  "rationale": "Maintenance mode; conserve battery" },
+      "DIMINISHING_DEGRADATION":   { "interval_min": 15,  "rationale": "Intervention in effect; track recovery closely" },
+      "ACCELERATING_DEGRADATION":  { "interval_min": 10,  "rationale": "Emergency; maximum resolution until phase changes" }
+    },
+    "post_mbt55_injection_window": {
+      "duration_h": 24,
+      "interval_min": 15,
+      "rationale": "AGENTS.md Rule#3: MBT55 cycle = 24h. Full-resolution monitoring for one complete biological clock cycle after each dose."
+    },
+    "low_power_mode": {
+      "trigger_voltage_V": 11.5,
+      "interval_min": 60,
+      "disable_ghg_sensors": false,
+      "rationale": "GHG output must never be suppressed (AGENTS.md Prohibited)"
+    }
+  },
+
+  "azure_iot_central_rules": [
+    {
+      "rule_name": "Emergency Degradation Alert",
+      "description": "Trigger AgriWare™ emergency prescription when soil enters ACCELERATING_DEGRADATION",
+      "condition": "soilEh < -50 AND soilPH < 5.0",
+      "action": "webhook → AgriWare™ API /api/v1/prescribe/emergency",
+      "severity": "critical"
+    },
+    {
+      "rule_name": "MBT55 Post-Injection Monitor",
+      "description": "Increase polling after MBT55 dose for full 24h biological clock",
+      "condition": "mbt55LastDoseL > 0",
+      "action": "setPollingInterval(15) for 24h",
+      "severity": "info"
+    },
+    {
+      "rule_name": "GHG Spike Alert",
+      "description": "N2O spike may indicate nitrification imbalance — route to PBPE immediately",
+      "condition": "ghgN2OFlux > 100",
+      "action": "Event Hub → PBPE Finance Engine + AgriWare™ alert",
+      "severity": "warning"
+    },
+    {
+      "rule_name": "Low Battery SSA Warning",
+      "description": "Solar battery low — switch to low-power mode before data loss",
+      "condition": "batteryVoltage < 11.5",
+      "action": "setPollingInterval(60); disable non-critical alerts",
+      "severity": "warning"
+    },
+    {
+      "rule_name": "Offline Buffer Flush",
+      "description": "Device reconnected after offline period — flush stored telemetry",
+      "condition": "signalRssi > -95 AFTER signalRssi <= -95",
+      "action": "device command: flushBuffer",
+      "severity": "info"
+    }
+  ],
+
+  "soil_dynamics_bridge": {
+    "_notes": "How IoT Central telemetry maps to soil_dynamics.py SoilSensorReading fields",
+    "mapping": {
+      "soilPH":          "SoilSensorReading.pH",
+      "soilEh":          "SoilSensorReading.Eh_mV",
+      "soilMoisture":    "SoilSensorReading.moisture_pct",
+      "soilTemperature": "SoilSensorReading.temperature_C",
+      "mbt55LastDoseL":  "SoilSensorReading.mbt55_dose_L_ha"
+    },
+    "pbpe_output_field": "soil_dynamics.run_soil_simulation().carbon_seq_rate",
+    "pbpe_schema_key":   "soil_carbon_seq_rate",
+    "pbpe_unit":         "tCO2/ha/year"
+  }
+}

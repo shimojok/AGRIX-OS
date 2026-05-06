@@ -63,3 +63,18 @@ AGRIX-OS is not a dashboard. It is a **control loop**:
 | `benchmarks/` | Case studies: coffee, rice, vegetables, livestock feed. |
 
 > *"Fertilizers feed plants. AGRIX-OS feeds soil."*
+
+---
+
+## 📚 Technical Documentation & Evidence
+
+Detailed documentation supporting the models in this repository is maintained in the BioNexus-Enterprise Evidence Vault:
+
+| Document | Location |
+|:---|:---|
+| Soil Dynamics ODE Model | `05_AGRIX_SafetyChain/01_soil_dynamics.md` |
+| AgriWare™ Diagnostic Engine | `05_AGRIX_SafetyChain/02_agriware_engine.md` |
+| SafetyChain™ Definition | `05_AGRIX_SafetyChain/03_safetychain_definition.md` |
+| V-Score Metabolic Life Model | `05_AGRIX_SafetyChain/04_vscore_model.md` |
+| Video Evidence (14 cases) | `02_Evidence/` |
+| GHG Finance & Green Premium | `03_GHG_Finance/` |
